@@ -322,6 +322,14 @@ func (e *endpoint) handleICMP(pkt *stack.PacketBuffer, hasFragmentHeader bool, r
 		return !hasFragmentHeader && iph.HopLimit() == header.NDPHopLimit && h.Code() == 0
 	}
 
+	// If DeliverTransportPacket returns stack.TransportPacketHandled, it
+	// indicates that a custom handler has already processed the packet.
+	// Therefore, no further processing should be performed on this packet.
+	res := e.dispatcher.DeliverTransportPacket(header.ICMPv4ProtocolNumber, pkt)
+	if res == stack.TransportPacketHandled {
+		return
+	}
+
 	// TODO(b/112892170): Meaningfully handle all ICMP types.
 	switch icmpType := h.Type(); icmpType {
 	case header.ICMPv6PacketTooBig:
@@ -710,7 +718,6 @@ func (e *endpoint) handleICMP(pkt *stack.PacketBuffer, hasFragmentHeader bool, r
 			received.invalid.Increment()
 			return
 		}
-		e.dispatcher.DeliverTransportPacket(header.ICMPv6ProtocolNumber, pkt)
 
 	case header.ICMPv6TimeExceeded:
 		received.timeExceeded.Increment()

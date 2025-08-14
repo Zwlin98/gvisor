@@ -516,12 +516,17 @@ func (s *Stack) TCPSendBufferLimits() tcpip.TCPSendBufferSizeRangeOption {
 	return s.transportProtocols[header.TCPProtocolNumber].proto.(SendBufSizeProto).SendBufferSize()
 }
 
+// TransportProtocolHandler is a function that handles packets for a
+// transport protocol. return false to indicate that the packet was not
+// handled, true to indicate that the packet was handled.
+// if false the PacketBuffer must not be modified!
+type TransportProtocolHandler func(TransportEndpointID, *PacketBuffer) bool
 // SetTransportProtocolHandler sets the per-stack default handler for the given
 // protocol.
 //
 // It must be called only during initialization of the stack. Changing it as the
 // stack is operating is not supported.
-func (s *Stack) SetTransportProtocolHandler(p tcpip.TransportProtocolNumber, h func(TransportEndpointID, *PacketBuffer) bool) {
+func (s *Stack) SetTransportProtocolHandler(p tcpip.TransportProtocolNumber, h TransportProtocolHandler) {
 	state := s.transportProtocols[p]
 	if state != nil {
 		state.defaultHandler = h
