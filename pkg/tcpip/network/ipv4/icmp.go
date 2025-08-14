@@ -290,14 +290,6 @@ func (e *endpoint) handleICMP(pkt *stack.PacketBuffer) {
 	// Only do in-stack processing if the checksum is correct.
 	if checksum.Checksum(h, pkt.Data().Checksum()) != 0xffff {
 		received.invalid.Increment()
-		// It's possible that a raw socket expects to receive this regardless
-		// of checksum errors. If it's an echo request we know it's safe because
-		// we are the only handler, however other types do not cope well with
-		// packets with checksum errors.
-		switch h.Type() {
-		case header.ICMPv4Echo:
-			e.dispatcher.DeliverTransportPacket(header.ICMPv4ProtocolNumber, pkt)
-		}
 		return
 	}
 
@@ -340,6 +332,14 @@ func (e *endpoint) handleICMP(pkt *stack.PacketBuffer) {
 		}
 	}
 
+	// If DeliverTransportPacket returns stack.TransportPacketHandled, it
+	// indicates that a custom handler has already processed the packet.
+	// Therefore, no further processing should be performed on this packet.
+	res := e.dispatcher.DeliverTransportPacket(header.ICMPv4ProtocolNumber, pkt)
+	if res == stack.TransportPacketHandled {
+		return
+	}
+
 	// TODO(b/112892170): Meaningfully handle all ICMP types.
 	switch h.Type() {
 	case header.ICMPv4Echo:
@@ -355,20 +355,9 @@ func (e *endpoint) handleICMP(pkt *stack.PacketBuffer) {
 		// DeliverTransportPacket so that is is only done when needed.
 		replyData := stack.PayloadSince(pkt.TransportHeader())
 		defer replyData.Release()
+
 		ipHdr := header.IPv4(pkt.NetworkHeader().Slice())
-		localAddressTemporary := pkt.NetworkPacketInfo.LocalAddressTemporary
 		localAddressBroadcast := pkt.NetworkPacketInfo.LocalAddressBroadcast
-
-		// It's possible that a raw socket or custom defaultHandler expects to
-		// receive this packet.
-		e.dispatcher.DeliverTransportPacket(header.ICMPv4ProtocolNumber, pkt)
-		pkt = nil
-
-		// Skip direct ICMP echo reply if the packet was received with a temporary
-		// address, allowing custom handlers to take over.
-		if localAddressTemporary {
-			return
-		}
 
 		sent := e.stats.icmp.packetsSent
 		if !e.protocol.allowICMPReply(header.ICMPv4EchoReply, header.ICMPv4UnusedCode) {
