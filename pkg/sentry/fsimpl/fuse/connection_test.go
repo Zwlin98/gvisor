@@ -69,24 +69,25 @@ func TestConnectionAbort(t *testing.T) {
 	testObj := primitive.Uint32(rand.Uint32())
 	for i := 0; i < int(numRequests); i++ {
 		req := conn.NewRequest(creds, uint32(i), uint64(i), 0, &testObj)
-		conn.fd.mu.Lock()
+		conn.mu.Lock()
 		fut, err := conn.callFutureLocked(req)
-		conn.fd.mu.Unlock()
+		conn.mu.Unlock()
 		if err != nil {
 			t.Fatalf("callFutureLocked failed: %v", err)
 		}
 		futNormal = append(futNormal, fut)
 	}
 
-	conn.fd.mu.Lock()
 	conn.Abort(s.Ctx)
-	conn.fd.mu.Unlock()
 
 	// Abort should unblock the initialization channel.
 	// Note: no test requests are actually blocked on `conn.initializedChan`.
+	conn.mu.Lock()
 	select {
 	case <-conn.initializedChan:
+		conn.mu.Unlock()
 	default:
+		conn.mu.Unlock()
 		t.Fatalf("initializedChan should not be blocking after SetInitialized")
 	}
 
