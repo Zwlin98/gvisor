@@ -103,7 +103,7 @@ func (p *protocol) ParsePorts(v []byte) (src, dst uint16, err tcpip.Error) {
 // HandleUnknownDestinationPacket handles packets targeted at this protocol but
 // that don't match any existing endpoint.
 func (*protocol) HandleUnknownDestinationPacket(stack.TransportEndpointID, *stack.PacketBuffer) stack.UnknownDestinationPacketDisposition {
-	return stack.UnknownDestinationPacketHandled
+	return stack.UnknownDestinationPacketUnhandled
 }
 
 // SetOption implements stack.TransportProtocol.SetOption.
